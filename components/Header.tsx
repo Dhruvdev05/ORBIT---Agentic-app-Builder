@@ -17,8 +17,9 @@ const Header = () => {
       <Image
       src= {"/orbit-logo.png"}
       alt="Orbit Logo"
-      width={250}
-      height={130}
+      width={220}
+      height={100}
+      
     // className="h-25 w-auto rounded-md"
       />
       </Link>
