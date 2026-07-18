@@ -23,3 +23,17 @@ export const SectionLabel = ({ children }: { children: React.ReactNode }) => (
     <span className="w-4 h-px bg-blue-400" />
   </p>
 );
+
+export const SectionHeading = ({
+  gray,
+  blue,
+}: {
+  gray: string;
+  blue: string;
+}) => (
+  <h2 className="font-serif text-[clamp(2rem,4vw,3rem)] leading-[1.1] tracking-tight">
+    <GrayTitle>{gray}</GrayTitle>
+    <br />
+    <BlueTitle>{blue}</BlueTitle>
+  </h2>
+);
