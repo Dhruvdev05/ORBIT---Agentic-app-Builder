@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { BlueTitle, GrayTitle, SectionHeading, SectionLabel } from "@/components/reusables";
 import { cn } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
-import { SignInButton, useAuth } from "@clerk/nextjs";
+import { PricingTable, SignInButton, useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { FEATURES, PLACEHOLDERS, STEPS, SUGGESTIONS } from "@/lib/data";
 import { ArrowRight, ChevronRight } from "lucide-react";
@@ -344,7 +344,17 @@ return () => clearInterval(t);
         </div>
 
            <div className="mx-auto grid max-w-5xl">
-            {/* /* {pricing change} */}
+            <PricingTable
+            checkoutProps={{
+              appearance: {
+                elements: {
+                  drawerRoot: {
+                    zIndex: 2000,
+                  }
+                }
+              }
+            }}
+            />
            </div>
         </section>
 
