@@ -5,9 +5,15 @@ import { ArrowRight, Zap } from 'lucide-react'
 import { Show, SignInButton, SignUpButton, UserButton } from '@clerk/nextjs'
 import { Button } from './ui/button'
 import PricingModal from './PricingModal'
+import { checkUser } from '@/lib/checkUser'
+import { PLANS } from '@/lib/constants'
+import { Plan } from '@/types/plans'
 
 
-const Header = () => {
+const Header = async () => {
+
+  const user = await checkUser();
+
   return(
 
 
@@ -41,7 +47,7 @@ const Header = () => {
             <PricingModal >
  <span className="inline-flex h-8 items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 text-xs text-white/70">
                   <Zap className="h-3 w-3 fill-white/70" />
-                 
+                 {user?.credits} / {PLANS[user?.plan as Plan].credits} credits
                 </span>
             </PricingModal>
                
