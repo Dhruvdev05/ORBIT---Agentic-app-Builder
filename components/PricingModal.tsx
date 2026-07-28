@@ -51,6 +51,7 @@ const PricingModal = ({ children , reason = "upgrade"} : PricingModalProps) => {
         },
     }}
     />
+
 </div>
 
         </DialogContent>

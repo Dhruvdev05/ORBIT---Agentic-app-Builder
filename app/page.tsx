@@ -60,6 +60,7 @@ return () => clearInterval(t);
     textareaRef.current?.focus();
   };
 
+  
 
   return (
      <main className="min-h-screen bg-[#0a0a0a] selection:bg-white/20">
@@ -127,7 +128,11 @@ return () => clearInterval(t);
               </span>
 
           {isSignedIn ? (
-            <Button>
+            <Button
+             onClick={handleSubmit}
+                  disabled={!prompt.trim()}
+                  className="h-8 rounded-full px-5 font-semibold"
+                  variant={prompt.trim() ? "default" : "secondary"}>
               Generate
             </Button>
           ) : (

@@ -43,7 +43,12 @@ export default function RootLayout({
       suppressHydrationWarning
     >
        <body className={`${lora.variable} ${dmSans.variable} font-sans`}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
        
 <Header />
         {children}
