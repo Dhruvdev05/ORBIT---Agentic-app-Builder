@@ -16,8 +16,14 @@ if (!userId)  redirect("/")
 
 
   return (
-   <WorkspaceClient/>
+   <WorkspaceClient
+  initialPrompt={prompt ?? null}  
+userCredits={10}
+  userId={userId}
+  userPlan="free"
+   />
   )
 }
 
 export default workspacePage
+
