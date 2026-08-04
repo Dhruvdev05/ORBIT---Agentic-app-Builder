@@ -14,6 +14,7 @@ if (!userId)  redirect("/")
 
   const { prompt, id } = await searchParams;
 
+let workspace = null;
 
   return (
    <WorkspaceClient
@@ -21,6 +22,7 @@ if (!userId)  redirect("/")
 userCredits={10}
   userId={userId}
   userPlan="free"
+  workspace={workspace}
    />
   )
 }

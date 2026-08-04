@@ -1,10 +1,12 @@
 "use client";
 
 import { Code } from 'lucide-react';
-import React, { useCallback, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { CodePanel } from './ui/CodePanel';
 import { FileData, Message, StatusStep, WorkspaceData } from '@/types/workspace';
 import ChatPanel from './ui/ChatPanel';
+import { MIN_CREDITS_TO_GENERATE } from '@/lib/constants';
+import { toast } from 'sonner';
 
 
 interface WorkspaceClientProps {
@@ -15,6 +17,21 @@ interface WorkspaceClientProps {
   userPlan: string;
 }
 
+function parseMessages(raw: unknown): Message[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (m): m is Message =>
+      typeof m === "object" && m !== null && "role" in m && "content" in m
+  );
+}
+
+function parseFileData(raw: unknown): FileData | null {
+  if (!raw || typeof raw !== "object") return null;
+  const f = raw as Record<string, unknown>;
+  if (!f.files || !f.dependencies) return null;
+  return raw as FileData;
+}
+
 
 export function WorkspaceClient  ({  initialPrompt,
   workspace,
@@ -22,12 +39,17 @@ export function WorkspaceClient  ({  initialPrompt,
   userId,
   userPlan,
 }: WorkspaceClientProps) {
-  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const [workspaceId, setWorkspaceId] = useState<string | null>(
+    workspace?.id ?? null,
+  );
   
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(
+    parseMessages(workspace?.messages),
+  );
   const [credits, setCredits] = useState(userCredits);
+
 const [fileData, setFileData] = useState<FileData | null>(
-null
+parseFileData(workspace?.fileData),
 )
   const [isGenerating, setIsGenerating] = useState(false);
   const [statusLog, setStatusLog] = useState<StatusStep[]>([]);
@@ -37,11 +59,143 @@ null
     setFileData(patches);
   }, []);
 
-  const handleGenerate = useCallback(
-        async (prompt: string, imageUrl?: string) => {
-        },[credits,isGenerating,userId,workspaceId]
+   // Refs to avoid stale closures in callbacks
+  const messagesRef = useRef<Message[]>(messages);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
-  )
+  const workspaceIdRef = useRef<string | null>(workspaceId);
+  useEffect(() => {
+    workspaceIdRef.current = workspaceId;
+  }, [workspaceId]);
+
+  // fileData ref — so handleImprove never closes over stale fileData
+  // even as file_patch events stream in
+  const fileDataRef = useRef<FileData | null>(fileData);
+  useEffect(() => {
+    fileDataRef.current = fileData;
+  }, [fileData]);
+
+  const pushStep = (label: string) => {
+    setStatusLog((prev) => [
+      ...prev.map((s, i) =>
+        i === prev.length - 1 ? { ...s, status: "done" as const } : s
+      ),
+      { label, status: "running" as const },
+    ]);
+  };
+
+   const completeSteps = () => {
+    setStatusLog((prev) =>
+      prev.map((s, i) =>
+        i === prev.length - 1 ? { ...s, status: "done" as const } : s
+      )
+    );
+  };
+
+  const handleGenerate = useCallback(
+    async (prompt: string, imageUrl?: string) => {
+      if (isGenerating) return;
+      if (credits < MIN_CREDITS_TO_GENERATE) return;
+
+
+            const userMessage: Message = {
+        role: "user",
+        content: prompt,
+        ...(imageUrl ? { imageUrl } : {}),
+      };
+
+
+  const currentMessages = messagesRef.current;
+      const currentWorkspaceId = workspaceIdRef.current;
+
+      
+      setMessages((prev) => [...prev, userMessage]);
+      setIsGenerating(true);
+      setStatusLog([{ label: "Thinking…", status: "running" }]);
+
+try{
+  const res = await fetch("/api/gen-ai-code", {
+      method: "POST",
+          headers: { "Content-Type": "application/json" },
+      
+          body: JSON.stringify({
+            workspaceId: currentWorkspaceId,
+            userId,
+            messages: [...currentMessages, userMessage],
+            fileData: fileDataRef.current,
+  }),
+});
+
+       if (res.status === 402) {
+          setMessages((prev) => prev.slice(0, -1));
+          return;
+        }
+        if (res.status === 429) {
+          toast.error("Too many requests. Please slow down.");
+          setMessages((prev) => prev.slice(0, -1));
+          return;
+        }
+        if (!res.ok || !res.body) throw new Error("Generation failed");
+
+         const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+         while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+           buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n\n");
+          buffer = lines.pop() ?? "";
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            try {
+              const event = JSON.parse(line.slice(6));
+
+                     if (event.type === "status") {
+                pushStep(event.message);
+              } else if (event.type === "done") {
+                completeSteps();
+                setWorkspaceId(event.workspaceId);
+                setFileData(event.fileData);
+                setCredits(event.creditsRemaining);
+                setMessages((prev) => [
+                  ...prev,
+                  { role: "assistant", content: event.assistantMessage },
+                ]);
+                window.history.replaceState(
+                  null,
+                  "",
+                  `/workspace?id=${event.workspaceId}`
+                );
+              } else if (event.type === "error") {
+                throw new Error(event.message);
+              }
+
+         }catch(error){
+          // skip sse line
+         }
+   }
+ }
+} catch (err) {
+toast.error(
+  err instanceof Error  ? err.message : "An error occurred during generation."
+);
+setMessages((prev) => prev.slice(0, -1));
+} finally {
+  setIsGenerating(false);
+  setStatusLog([]);
+}
+
+    },[credits, isGenerating, userId]
+
+  
+
+    )
   return (
     <div className="flex h-[calc(100vh-4rem)] overflow-hidden bg-[#0a0a0a]">
       <ChatPanel
@@ -54,7 +208,7 @@ null
           onGenerate={handleGenerate}
           userId={userId}
           workspaceId={workspaceId}
-          appTitle={"My App"}
+          appTitle={fileData?.title ?? workspace?.title ?? null}
         />
     
 
