@@ -4,6 +4,7 @@ import { FileData, Message } from "@/types/workspace";
 import { CREDIT_COST_PER_GENERATION } from "@/lib/constants";
 import { db } from "@/lib/prisma";
 import { GoogleGenAI } from "@google/genai";
+import { aj } from "@/lib/arcjet";
 
 function trimHistory(messages: Message[]): Message[] {
   if (messages.length <= 10) return messages;
@@ -130,6 +131,31 @@ export async function POST(request: NextRequest) {
 
      if (!messages?.length) {
     return Response.json({ message: "No messages provided" }, { status: 400 });
+  }
+
+  //  ── Arcjet: rate limit, prompt injection, sensitive info ──────────────────
+  // detectPromptInjectionMessage requires the actual user text to inspect.
+
+  const arcjetReq = new Request(request.url, {
+    method: request.method,
+    headers: request.headers,
+    body: JSON.stringify(body),
+  });
+
+   const lastUserMessage =
+    [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
+
+    const decision = await aj.protect(request, {
+    requested: 1,
+    userId: clerkId,
+    detectPromptInjectionMessage: lastUserMessage,
+  });
+  
+  if (decision.isDenied()) {
+    return Response.json(
+      { message: decision.reason?.type ?? "Request blocked" },
+      { status: 429 }
+    );
   }
 
    const user = await db.user.findUnique({
