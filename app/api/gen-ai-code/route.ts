@@ -122,9 +122,8 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { workspaceId, userId, messages, fileData } = body as {
+    const { workspaceId, messages, fileData } = body as {
         workspaceId: string | null;
-        userId: string;
         messages: Message[];
         fileData: FileData | null;
     } 
@@ -252,32 +251,46 @@ const contents = buildContents(messages, fileData);
           ...messages,
           { role: "assistant", content: assistantMessage },
         ];
+        const dbUserId = user.id;
 
-        const [workspace] = await db.$transaction([
-          workspaceId
-            ? db.workspace.update({
-                where: { id: workspaceId, userId },
-                data: {
-                  messages: updatedMessages as never,
-                  fileData: newFileData as never,
-                },
+        const workspace = await db.$transaction(async (tx) => {
+          const ws = workspaceId
+            ? await tx.workspace.findFirst({
+                where: { id: workspaceId, userId: dbUserId },
+              }).then((existingWorkspace) => {
+                if (!existingWorkspace) {
+                  throw new Error("Workspace not found");
+                }
+
+                return tx.workspace.update({
+                  where: { id: workspaceId },
+                  data: {
+                    messages: updatedMessages as never,
+                    fileData: newFileData as never,
+                  },
+                });
               })
-            : db.workspace.create({
+            : await tx.workspace.create({
                 data: {
-                  userId,
+                  userId: dbUserId,
                   title: aiTitle ?? lastUserMessage.content.slice(0, 80),
                   messages: updatedMessages as never,
                   fileData: newFileData as never,
                 },
-              }),
-          db.user.update({
-            where: { id: userId },
+              });
+
+          await tx.user.update({
+            where: { id: dbUserId },
             data: { credits: { decrement: CREDIT_COST_PER_GENERATION } },
-          }),
-        ]);
+          });
+
+          return ws;
+        },
+        { timeout: 200000, maxWait: 200000 }
+        );
 
         const updatedUser = await db.user.findUnique({
-          where: { id: userId },
+          where: { id: dbUserId },
           select: { credits: true },
         });
 
