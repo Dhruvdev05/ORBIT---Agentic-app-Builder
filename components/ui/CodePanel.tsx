@@ -13,7 +13,9 @@ import {
 } from "@codesandbox/sandpack-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { dracula } from "@codesandbox/sandpack-themes";
-import { Code2, Eye } from "lucide-react";
+import { AlertTriangle, Bot, Code2, Eye } from "lucide-react";
+import { RingLoader } from "react-spinners";
+import { Button } from "./button";
 
 const PLACEHOLDER_FILES = {
   "/App.js": {
@@ -70,9 +72,10 @@ interface CodePanelProps {
   onImprove: (userRequest: string) => Promise<void>;
   onFixError: (error: string) => Promise<void>;
   onFilePatch: (patches: FileData) => void;
-//   appTitle: string | null;
-//   isImproving: boolean;
+
+  isImproving: boolean;
 //   isProUser: boolean;
+// //   appTitle: string | null;
 }
 
 function SandpackInner({
@@ -80,18 +83,62 @@ function SandpackInner({
   activeTab,
   setActiveTab,
   fileData,
- 
+  isImproving,
+  statusLog,
+ onFixError,
 }: {
   isGenerating: boolean;
   activeTab: ActiveTab;
   setActiveTab: (t: ActiveTab) => void;
   fileData: FileData | null;
-  
+  isImproving: boolean;
+  statusLog: StatusStep[];
+  onFixError: (error: string) => Promise<void>;
 }) {
   const { sandpack,listen } = useSandpack();
-
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [improveInput, setImproveInput] = useState("");
+  const [showImproveInput, setShowImproveInput] = useState(false);
+  const unsubscribeRef = useRef<(() => void) | null>(null);
 
   const prevFilesRef = useRef<Record<string, string>>({});
+
+ useEffect(() => {
+    unsubscribeRef.current = listen((msg) => {
+      if (
+        msg.type === "action" &&
+        "action" in msg &&
+        msg.action === "show-error"
+      ) {
+        const errMsg =
+          "message" in msg && typeof msg.message === "string"
+            ? msg.message
+            : "An error occurred in the preview.";
+        setPreviewError(errMsg);
+        return;
+      }
+      
+      if (msg.type === "compile") {
+        const errMsg =
+          "message" in msg && typeof msg.message === "string"
+            ? msg.message
+            : "Compile error in preview.";
+        setPreviewError(errMsg);
+        return;
+      }
+      if (msg.type === "success") {
+        setPreviewError(null);
+      }
+    });
+    return () => unsubscribeRef.current?.();
+  }, [listen]);
+
+
+  useEffect(() => {
+    if (isGenerating) setPreviewError(null);
+  }, [isGenerating]);
+
 
   useEffect(() => {
     if (!fileData?.files) return;
@@ -106,11 +153,17 @@ function SandpackInner({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileData?.files]);
 
+useEffect(() => {
+  if(fileData) setActiveTab("preview");
+
+}, [fileData])
+
   return (
    <Tabs value={activeTab}
       onValueChange={(v) => setActiveTab(v as ActiveTab)}
       className="flex h-full flex-col gap-0">
-        <div className="flex items-center justify-between border-b border-white/6 px-2">
+
+        <div className="relative flex items-center justify-between border-b border-white/6 px-2">
 
         
   <TabsList
@@ -129,6 +182,22 @@ function SandpackInner({
   </TabsList>
   </div>
   <div className="relative flex-1 overflow-hidden h-full">
+ {(isGenerating || isImproving) && (
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-6 bg-[#0a0a0a]/85 backdrop-blur-sm">
+            <RingLoader color="#60a5fa" size={64} speedMultiplier={0.8} />
+            <div className="flex flex-col items-center gap-1.5">
+              <p className="text-sm font-medium text-white/60">
+                {isImproving ? "Improving with Cline AI…" :
+                  statusLog[statusLog.length - 1]?.label ?? "Generating…"
+}
+              </p>
+              <p className="text-xs text-white/20">
+                This usually takes 10–20 seconds
+              </p>
+            </div>
+          </div>
+        )}
+
 
         <SandpackLayout
           style={{
@@ -171,11 +240,36 @@ function SandpackInner({
             />
           </TabsContent>
         </SandpackLayout>
-      </div>
+        </div>
 
+ {/* Preview error banner — uses onFixError (Gemini), not onImprove (Cline) */}
+      {previewError &&
+        !isGenerating &&
+        !isImproving &&
+        activeTab === "preview" && (
+          <div className="absolute inset-x-0 -bottom-3 z-20 border-t border-red-500/20 bg-red-950/99 p-4 pb-6">
+            <div className="flex items-center gap-2.5">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-400/70" />
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-red-400/80">
+                  Preview error
+                </p>
+                <p className="break-all text-[11px] text-red-300/50">
+                  {previewError}
+                </p>
+              </div>
+              <Button
+                onClick={() => onFixError(previewError)}
+                variant="destructive"
+              >
+                <Bot className="h-3 w-3" />
+                Fix with AI
+              </Button>
+            </div>
+          </div>
+        )}
 </Tabs>
-  )
-
+  );
 }
 
 export function CodePanel({
@@ -183,6 +277,8 @@ export function CodePanel({
   isGenerating,
   statusLog,
 onFilePatch: _onFilePatch,
+isImproving,
+onFixError,
 } : CodePanelProps) {
 const [activeTab, setActiveTab] = useState<ActiveTab>("preview");
 
@@ -213,6 +309,9 @@ fileData={fileData}
 isGenerating={isGenerating}
 activeTab={activeTab}
 setActiveTab={setActiveTab}
+statusLog={statusLog}
+isImproving={isImproving}
+onFixError={onFixError}
 />
     </SandpackProvider>
     </div>

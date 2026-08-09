@@ -65,6 +65,10 @@ parseFileData(workspace?.fileData),
     messagesRef.current = messages;
   }, [messages]);
 
+// AbortController refs — used to cancel in-flight streams
+  const generateAbortRef = useRef<AbortController | null>(null);
+  const improveAbortRef = useRef<AbortController | null>(null);
+
   const workspaceIdRef = useRef<string | null>(workspaceId);
   useEffect(() => {
     workspaceIdRef.current = workspaceId;
@@ -115,11 +119,16 @@ parseFileData(workspace?.fileData),
       setIsGenerating(true);
       setStatusLog([{ label: "Thinking…", status: "running" }]);
 
+      
+      // Create a fresh AbortController for this request
+      const abortController = new AbortController();
+      generateAbortRef.current = abortController;
+
 try{
   const res = await fetch("/api/gen-ai-code", {
       method: "POST",
           headers: { "Content-Type": "application/json" },
-      
+      signal: abortController.signal,
           body: JSON.stringify({
             workspaceId: currentWorkspaceId,
             userId,
@@ -182,11 +191,18 @@ try{
    }
  }
 } catch (err) {
+// User-initiated stop — silently roll back the user message
+        if (err instanceof Error && err.name === "AbortError") {
+          setMessages((prev) => prev.slice(0, -1));
+          return;
+        }
+
 toast.error(
   err instanceof Error  ? err.message : "An error occurred during generation."
 );
 setMessages((prev) => prev.slice(0, -1));
 } finally {
+  generateAbortRef.current = null;
   setIsGenerating(false);
   setStatusLog([]);
 }
@@ -194,8 +210,13 @@ setMessages((prev) => prev.slice(0, -1));
     },[credits, isGenerating, userId]
 
   
-
     )
+
+    const handleStop = useCallback(() => {
+      generateAbortRef.current?.abort();
+      improveAbortRef.current?.abort();
+    },[])
+
   return (
     <div className="flex h-[calc(100vh-4rem)] overflow-hidden bg-[#0a0a0a]">
       <ChatPanel
@@ -205,6 +226,7 @@ setMessages((prev) => prev.slice(0, -1));
           statusLog={statusLog}
           credits={credits}
           initialPrompt={initialPrompt}
+          onStop={handleStop}
           onGenerate={handleGenerate}
           userId={userId}
           workspaceId={workspaceId}
@@ -218,6 +240,12 @@ setMessages((prev) => prev.slice(0, -1));
   isGenerating={isGenerating}
   statusLog={statusLog}
   onFilePatch={handleFilePatch}
+  isImproving={isImproving}
+  onFixError={(error) =>
+            handleGenerate(
+              `There is an error in the preview:\n\n\`\`\`\n${error}\n\`\`\`\n\nPlease fix it.`
+            )
+          }
    />
     </div>
   );
