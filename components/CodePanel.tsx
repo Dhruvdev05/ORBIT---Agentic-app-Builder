@@ -111,7 +111,7 @@ const [showImproveInput, setShowImproveInput] = useState(false);
   
   const unsubscribeRef = useRef<(() => void) | null>(null);
 
-  const prevFilesRef = useRef<Record<string, string>>({});
+const prevFilesRef = useRef<Record<string, { code: string }>>({});
 
     const handleImproveSubmit = async () => {
     const trimmed = improveInput.trim();
