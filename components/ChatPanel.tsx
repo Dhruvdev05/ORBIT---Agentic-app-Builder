@@ -1,8 +1,8 @@
 import { Message, StatusStep } from "@/types/workspace";
 import { useUser } from "@clerk/nextjs";
 import React, { KeyboardEvent, useEffect, useRef, useState } from "react";
-import { BlueTitle } from "../reusables";
-import PricingModal from "../PricingModal";
+import { BlueTitle } from "./reusables";
+import PricingModal from "./PricingModal";
 import { cn } from "@/lib/utils";
 import { ArrowUp, Loader2, Paperclip, Square, Wand2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";

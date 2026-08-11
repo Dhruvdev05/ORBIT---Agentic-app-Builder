@@ -19,7 +19,7 @@ if (!userId)  redirect("/")
 
 let workspace = null;
 if (id) {
-  workspace = await getWorkspaceById(id, userId);
+  workspace = await getWorkspaceById(id, user.id);
 }
 
   return (

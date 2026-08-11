@@ -2,9 +2,9 @@
 
 import { Code } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { CodePanel } from './ui/CodePanel';
+import { CodePanel } from './CodePanel';
 import { FileData, Message, StatusStep, WorkspaceData } from '@/types/workspace';
-import ChatPanel from './ui/ChatPanel';
+import ChatPanel from './ChatPanel';
 import { MIN_CREDITS_TO_GENERATE } from '@/lib/constants';
 import { toast } from 'sonner';
 

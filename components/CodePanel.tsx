@@ -16,8 +16,8 @@ import { dracula } from "@codesandbox/sandpack-themes";
 import { AlertTriangle, ArrowUp, Bot, Code2, Download, Eye, Loader2 } from "lucide-react";
 import { RingLoader } from "react-spinners";
 import JSZip from "jszip";
-import { Button } from "./button";
-import PricingModal from "../PricingModal";
+import { Button } from "@/components/ui/button";
+import PricingModal from "./PricingModal";
 
 const PLACEHOLDER_FILES = {
   "/App.js": {
